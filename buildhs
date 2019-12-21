@@ -1,0 +1,3 @@
+#!/bin/sh
+
+ghc -odir hs-out -hidir hs-out $1 -o hs-out/main
