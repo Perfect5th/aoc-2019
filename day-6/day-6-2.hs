@@ -22,13 +22,6 @@ split (')':xs) = ("", xs)
 split ( x :xs) = (x:xs', xs'')
     where (xs', xs'') = split xs
 
-checksum orbMap =
-    let helper m depth k =
-            case Map.lookup k m of
-                Nothing -> depth
-                Just cs -> (depth +) . sum $ map (helper m (depth + 1)) cs
-    in  helper orbMap 0 "COM"
-
 findPath target orbMap =
     let helper m target path k =
             case Map.lookup k m of
