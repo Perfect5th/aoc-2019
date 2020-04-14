@@ -16,13 +16,17 @@ INPUT = [
 
 
 def fuel_required(module):
-    return max((module // 3) - 2, 0)
+    return max(module // 3 - 2, 0)
 
 
 if __name__ == '__main__':
+    """
     total = 0
 
     for i in INPUT:
         total += fuel_required(i)
+    """
+
+    total = sum(map(lambda i: max(i // 3 - 2, 0), INPUT))
 
     print(total)
