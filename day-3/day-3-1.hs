@@ -1,40 +1,44 @@
 import qualified Data.Text as Text
 import qualified Data.Set as Set
+import Debug.Trace
 
 main = do
     rawInput <- readFile "input.txt"
-    print $ solve $ map parseWire $ lines rawInput
+    let parsed = parseInput rawInput
+    print $ solve parsed
 
-parseWire rawWire =
-    map Text.unpack $ Text.splitOn (Text.pack ",") $ Text.pack rawWire
+parseInput input =
+    map (map Text.unpack) [Text.splitOn (Text.pack ",") $ Text.pack i | i <- lines input]
 
 solve (wire1:wire2:[]) =
-    let wireSet = walkWire wire1 addSteps Set.empty
-        intersections = walkWire wire2 (findIntersections wireSet) Set.empty
-     in minimum $ Set.map (manhattan (0,0)) intersections
+    let wire1Set = walkWire wire1 addToSet Set.empty
+        intersections = walkWire wire2 (findIntersections wire1Set) Set.empty
+     in minimum $ Set.map manhattan intersections
 
 walkWire :: [String] -> ([(Int, Int)] -> t1 -> t1) -> t1 -> t1
 walkWire wire f acc =
     let walkWire [] prev acc = acc
-        walkWire (w:ws) prev acc =
-            let (newPrev,steps) = getSteps prev w
+        walkWire (corner:corners) prev acc =
+            let (newPrev,steps) = getSteps prev corner
                 newAcc = f steps acc
-             in walkWire ws newPrev newAcc
-    in walkWire wire (0,0) acc
+             in walkWire corners newPrev newAcc
+     in walkWire wire (0,0) acc
 
-addSteps :: [(Int, Int)] -> Set.Set (Int, Int) -> Set.Set (Int, Int)
-addSteps steps wireSet = foldl (\ws s -> Set.insert s ws) wireSet steps
+addToSet :: [(Int, Int)] -> Set.Set (Int, Int) -> Set.Set (Int, Int)
+addToSet steps set = foldl (\s x -> Set.insert x s) set steps
 
 findIntersections :: Set.Set (Int, Int) -> [(Int, Int)] -> Set.Set (Int, Int) -> Set.Set (Int, Int)
-findIntersections wire1Set steps wire2Set =
-    let addIfPresent w2s s = if Set.member s wire1Set then Set.insert s w2s else w2s
-     in foldl addIfPresent wire2Set steps
+findIntersections set1 [] set2 = set2
+findIntersections set1 (step:steps) set2 =
+    if Set.member step set1
+       then Set.insert step $ findIntersections set1 steps set2
+       else findIntersections set1 steps set2
 
-getSteps (prevX,prevY) (dir:distStr)
-  | dir == 'U' = ((prevX,prevY + dist),zip (repeat prevX) [prevY + 1..prevY + dist])
-  | dir == 'R' = ((prevX + dist,prevY),zip [prevX + 1..prevX + dist] (repeat prevY))
-  | dir == 'D' = ((prevX,prevY - dist),zip (repeat prevX) [prevY - 1,prevY - 2..prevY - dist])
-  | dir == 'L' = ((prevX - dist,prevY),zip [prevX - 1,prevX - 2..prevX - dist] (repeat prevY))
+manhattan (x,y) = abs x + abs y
+
+getSteps (x,y) (dir:distStr)
+  | dir == 'U' = ((x,y + dist), zip (repeat x) [y+1..y+dist])
+  | dir == 'D' = ((x,y - dist), zip (repeat x) [y-1,y-2..y-dist])
+  | dir == 'R' = ((x + dist,y), zip [x+1..x+dist] $ repeat y)
+  | dir == 'L' = ((x - dist,y), zip [x-1,x-2..x-dist] $ repeat y)
   where dist = read distStr :: Int
-
-manhattan (startX,startY) (endX,endY) = abs (endX - startX) + abs (endY - startY)
