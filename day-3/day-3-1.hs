@@ -1,6 +1,5 @@
 import qualified Data.Text as Text
 import qualified Data.Set as Set
-import Debug.Trace
 
 main = do
     rawInput <- readFile "input.txt"
@@ -15,7 +14,6 @@ solve (wire1:wire2:[]) =
         intersections = walkWire wire2 (findIntersections wire1Set) Set.empty
      in minimum $ Set.map manhattan intersections
 
-walkWire :: [String] -> ([(Int, Int)] -> t1 -> t1) -> t1 -> t1
 walkWire wire f acc =
     let walkWire [] prev acc = acc
         walkWire (corner:corners) prev acc =
@@ -24,10 +22,8 @@ walkWire wire f acc =
              in walkWire corners newPrev newAcc
      in walkWire wire (0,0) acc
 
-addToSet :: [(Int, Int)] -> Set.Set (Int, Int) -> Set.Set (Int, Int)
 addToSet steps set = foldl (\s x -> Set.insert x s) set steps
 
-findIntersections :: Set.Set (Int, Int) -> [(Int, Int)] -> Set.Set (Int, Int) -> Set.Set (Int, Int)
 findIntersections set1 [] set2 = set2
 findIntersections set1 (step:steps) set2 =
     if Set.member step set1
