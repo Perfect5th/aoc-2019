@@ -1,147 +1,33 @@
-import System.IO
-
-inOp = 3
-outOp = 4
-jiftOp = 5
-jiffOp = 6
-haltOp = 99
-
-data CompState = CompState { position :: Int
-                           , tape :: [Int]
-                           , input :: IO String
-                           , output :: (String -> IO ())
-                           , halted :: Bool
-                           , opcode :: Int
-                           , op :: Int
-                           , vals :: (Int, Int, Int)
-                           , modes :: (Int, Int, Int)
-                           , valP :: Int
-                           }
-
-intCodeComputer :: IO CompState -> IO ()
-intCodeComputer state = do
-    currState <- state
-    if halted currState
-        then return ()
-        else intCodeComputer
-             . writeback
-             . execute
-             . decode
-             $ fetch currState
-
-fetch :: CompState -> IO CompState
-fetch state = do
-    let opcode = tape state !! position state
-    return state { opcode=opcode
-                 , op=mod opcode 100
-                 , modes=( mod (div opcode 100) 10
-                         , mod (div opcode 1000) 10
-                         , mod (div opcode 10000) 10
-                         )
-                 }
-
-decode :: IO CompState -> IO (CompState, (Int -> Int -> IO Int))
-decode state = do
-    state <- state
-    return ( state { vals=getVals state, valP=getValP state }
-               , getFunc state
-               )
-
-execute :: IO (CompState, Int -> Int -> IO Int) -> IO (CompState, IO Int)
-execute arg = do
-    (state, func) <- arg
-    let (val1, val2, _) = vals state
-    return (state, func val1 val2)
-
-writeback :: IO (CompState, IO Int) -> IO CompState
-writeback arg = do
-    (state, valE) <- arg
-    val <- valE
-    return (updateState state val)
-
-updateState :: CompState -> Int -> CompState
-updateState state valE
-    | op state < 3 =
-        let (_, _, pos) = vals state
-            (tapehd, tapetail) = splitAt pos $ tape state
-        in  state { tape=tapehd ++ valE : tail tapetail, position=(position state) + (valP state) }
-    | op state == inOp =
-        let (pos, _, _) = vals state
-            (tapehd, tapetail) = splitAt pos $ tape state
-        in  state { tape=tapehd ++ valE : tail tapetail, position=(position state) + (valP state) }
-    | op state == haltOp = state { halted=True, position=(position state) + (valP state) }
-    | op state == jiftOp =
-        let (val1, val2, _) = vals state
-        in  state { position=(if val1 /= 0 then val2 else (position state) + (valP state)) }
-    | op state == jiffOp =
-        let (val1, val2, _) = vals state
-        in  state { position=(if val1 == 0 then val2 else (position state) + (valP state)) }
-    | otherwise = state { position=(position state) + (valP state) }
-
-getVals :: CompState -> (Int, Int, Int)
-getVals state = let (mode1, mode2, _) = modes state
-                in  ( getVal 1 mode1 state
-                    , getVal 2 mode2 state
-                    , getVal 3 1 state
-                    )
-
-getVal :: Int -> Int -> CompState -> Int
-getVal pos mode state
-    | op state == haltOp = 0
-    | (op state == inOp || op state == outOp) && pos > 1 = 0
-    | mode == 1 || op state == inOp = tape state !! (position state + pos)
-    | otherwise = tape state !! (tape state !! (position state + pos))
-
-solve ipt = do
-    intCodeComputer (return (CompState { position=0
-                                     , tape=ipt
-                                     , input=getLine
-                                     , output=putStrLn
-                                     , halted=False
-                                     , opcode=0
-                                     , op=0
-                                     , vals=(0, 0, 0)
-                                     , modes=(0, 0, 0)
-                                     , valP=0
-                                     }))
-    return ()
-
-getValP :: CompState -> Int
-getValP state
-    | op state == inOp || op state == outOp = 2
-    | op state == haltOp = 1
-    | op state == jiftOp || op state == jiffOp = 3
-    | otherwise = 4
-
-getFunc :: CompState -> (Int -> Int -> IO Int)
-getFunc state
-    | op state == 1 = (\x y -> return ((+) x y))
-    | op state == 2 = (\x y -> return ((*) x y))
-    | op state == inOp = getInput state
-    | op state == outOp = writeOutput state
-    | op state == 7 = (\x y -> return (if x < y then 1 else 0))
-    | op state == 8 = (\x y -> return (if x == y then 1 else 0))
-    | otherwise = (\x y -> return 0)
-
-getInput :: CompState -> (Int -> Int -> IO Int)
-getInput state =
-    (\x y -> do
-        val <- input state
-        return (read val::Int))
-
-writeOutput :: CompState -> (Int -> Int -> IO Int)
-writeOutput state =
-    (\x y -> do
-        output state (show x)
-        return 0)
-
-prep :: String -> [Int]
-prep s = case dropWhile (==',') s of
-              "" -> []
-              s' -> (read w::Int) : prep s''
-                    where (w, s'') =
-                           break (==',') s'
+import Data.Array.IArray
+import Data.Text.Read
+import qualified Data.Text as T
+import Debug.Trace
 
 main = do
-    contents <- readFile "day-5/input.txt"
-    solve $ prep contents
+    rawInput <- readFile "input.txt"
+    let input   = map (\i -> read (T.unpack i) :: Int) $ T.splitOn (T.pack ",") $ T.pack rawInput
+        asArray :: Array Int Int
+        asArray = listArray (0,length input - 1) input
+     in print $ head $ run asArray 0 [5] []
+
+run prgm pc input output
+    | opcode == 99 = output
+    | opcode == 3  = run (prgm // [(arg1, head input)]) (pc + 2) (tail input) output
+    | opcode == 4  = run prgm (pc + 2) input $ (prgm ! arg1) : output
+    | opcode == 5  = run prgm (if arg1 /= 0 then arg2 else pc + 3) input output
+    | opcode == 6  = run prgm (if arg1 == 0 then arg2 else pc + 3) input output
+    | otherwise    = run (prgm // [(arg3, op opcode arg1 arg2)]) (pc + 4) input output
+    where opcodeModes = prgm ! pc
+          opcode      = opcodeModes `mod` 100
+          arg1        = getArg opcode prgm (opcodeModes `quot` 100 `mod` 10) (pc + 1)
+          arg2        = getArg opcode prgm (opcodeModes `quot` 1000 `mod` 10) (pc + 2)
+          arg3        = prgm ! (pc + 3)
+
+op 1 = (+)
+op 2 = (*)
+op 7 = (\arg1 arg2 -> if arg1 < arg2 then 1 else 0)
+op 8 = (\arg1 arg2 -> if arg1 == arg2 then 1 else 0)
+
+getArg 3 prgm mode pos = prgm ! pos
+getArg 4 prgm mode pos = prgm ! pos
+getArg opcode prgm mode pos = if mode == 1 then prgm ! pos else prgm ! (prgm ! pos)
