@@ -1,7 +1,6 @@
 import Data.Array.IArray
 import Data.Text.Read
 import qualified Data.Text as T
-import Debug.Trace
 
 main = do
     rawInput <- readFile "input.txt"
