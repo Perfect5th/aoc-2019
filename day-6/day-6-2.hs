@@ -1,45 +1,42 @@
-import qualified Data.Map as Map
+import qualified Data.Map.Lazy as Map
+import qualified Data.Set as Set
+import Debug.Trace
 
 main = do
-    contents <- readFile "day-6/input.txt"
-    print . solve $ lines contents
+    rawInput <- readFile "input.txt"
+    let input = lines rawInput
+     in print $ solve input
 
-solve ipt = let parsed = parse ipt
-                youPath = reverse $ findPath "YOU" parsed
-                sanPath = reverse $ findPath "SAN" parsed
-            in  commonPath youPath sanPath
+solve orbList =
+    let parMap = foldl (\m o -> addToParMap m $ splitOrb o) Map.empty orbList
+        orbMap = foldl (\m o -> addToOrbMap m $ splitOrb o) Map.empty orbList
+     in traverseOrbs parMap orbMap
 
-parse ipt = foldr addToMap Map.empty ipt
+splitOrb orb =
+    let (parBrkt,child) = splitAt 4 orb
+     in (take 3 parBrkt,child)
 
-addToMap orb orbMap =
-    let (parent, child) = split orb
-    in  case Map.lookup parent orbMap of
-        Just cs -> Map.insert parent (child : cs) orbMap
-        Nothing -> Map.insert parent [child] orbMap
+addToParMap parMap (parent,child) = Map.insert child parent parMap
 
-split []       = ([], [])
-split (')':xs) = ("", xs)
-split ( x :xs) = (x:xs', xs'')
-    where (xs', xs'') = split xs
+addToOrbMap orbMap (parent,child) =
+    case Map.lookup parent orbMap of
+      Just cs -> Map.insert parent (child : cs) orbMap
+      Nothing -> Map.insert parent [child] orbMap
 
-findPath target orbMap =
-    let helper m target path k =
-            case Map.lookup k m of
-                Nothing -> []
-                Just cs -> if any (target==) cs
-                           then path
-                           else let candidates = filter ((0<) . length)
-                                                 $ map (\c -> helper m target (c : path) c) cs
-                                in  case candidates of
-                                        []     -> []
-                                        (x:xs) -> x
-    in   helper orbMap target [] "COM"
-
-commonPath x y =
-    let helper [] _  _           = -1
-        helper _  [] _           = -1
-        helper (x:x') (y:y') acc
-            | x == y    = helper x' y' acc
-            | otherwise = length x' + length y' + 2
-
-    in  helper x y 0
+traverseOrbs parMap orbMap =
+    let traverseUp curr otherCurr currSet otherSet =
+            case Map.lookup curr parMap of
+              Nothing -> -1
+              Just pa ->
+                  if Set.member pa otherSet
+                     then traverseDown pa otherSet $ length currSet
+                     else traverseUp otherCurr pa otherSet (Set.insert pa currSet)
+        traverseDown curr orbSet count =
+            case Map.lookup curr orbMap of
+              Nothing -> -1
+              Just cs ->
+                  if any (\c -> elem c ["SAN","YOU"]) cs
+                     then count
+                     else let next = head $ filter (flip Set.member orbSet) cs
+                           in traverseDown next orbSet $ count + 1
+     in traverseUp "SAN" "YOU" Set.empty Set.empty

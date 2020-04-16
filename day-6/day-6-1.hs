@@ -1,5 +1,4 @@
 import qualified Data.Map.Lazy as Map
-import Debug.Trace
 
 main = do
     rawInput <- readFile "input.txt"
