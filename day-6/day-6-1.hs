@@ -1,23 +1,25 @@
-import qualified Data.Map as Map
+import qualified Data.Map.Lazy as Map
+import Debug.Trace
 
 main = do
-    contents <- readFile "day-6/input.txt"
-    print . solve $ lines contents
+    rawInput <- readFile "input.txt"
+    let input = lines rawInput
+     in print $ solve input
 
-solve ipt = checksum $ parse ipt
+solve orbList =
+     let orbMap = foldl addToMap Map.empty orbList
+     in traverseOrbs orbMap
 
-parse ipt = foldr addToMap Map.empty ipt
+addToMap orbMap orb =
+    let (keyBrkt,val) = splitAt 4 orb
+        key = take 3 keyBrkt
+     in case Map.lookup key orbMap of
+          Just v -> Map.insert key (val : v) orbMap
+          Nothing -> Map.insert key [val] orbMap
 
-addToMap orb orbMap =
-    let (p, child) = splitAt 4 orb
-        parent = take 3 p
-    in  case Map.lookup parent orbMap of
-        Just cs -> Map.insert parent (child : cs) orbMap
-        Nothing -> Map.insert parent [child] orbMap
-
-checksum orbMap =
-    let helper m depth k =
-            case Map.lookup k m of
-                Nothing -> depth
-                Just cs -> (depth +) . sum $ map (helper m (depth + 1)) cs
-    in   helper orbMap 0 "COM"
+traverseOrbs orbMap =
+    let traverseOrbs depth k =
+            case Map.lookup k orbMap of
+              Just v -> (+) depth $ sum $ map (traverseOrbs $ depth + 1) v
+              Nothing -> depth
+     in traverseOrbs 0 "COM"
