@@ -2,7 +2,6 @@ import Data.Array.IArray
 import Data.Text.Read
 import qualified Data.List as L
 import qualified Data.Text as T
-import Debug.Trace
 
 type NextCycle = (Int -> CycleState)
 data CycleState = Input NextCycle | Output Int NextCycle | Halted
