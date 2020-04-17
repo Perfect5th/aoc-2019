@@ -18,20 +18,18 @@ generateSettings =
      in filter ((==5) . length . L.nub) [[a,b,c,d,e] | a <- r, b <- r, c <- r, d <- r, e <- r]
 
 runPipelined prgm settings =
-    let run :: [CycleState] -> [Int] -> Int
-        run [] output = head output
+    let run [] output = head output
         run (amp:amps) output =
             case amp of
               Input n -> run (n (head output) : amps) $ tail output
               Output i n -> run (amps ++ [n 0]) $ output ++ [i]
               Halted -> run amps output
-        prepareAmps [] = []
-        prepareAmps (setting:settings) =
+        prepareAmps setting =
             case runCycle prgm of
-              Input n -> n setting : prepareAmps settings
+              Input n -> n setting
               Output i n -> error "Got output when preparing amp"
               Halted -> error "Amp halted during prep"
-     in run (prepareAmps settings) [0]
+     in run (map prepareAmps settings) [0]
 
 runCycle prgm =
     let run :: Array Int Int -> Int -> CycleState
